@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
     <head>
-        <title>SimpleWebRTC Demo</title>
+        <title>MCU Demo</title>
     </head>
     <body>
         <h1 id="title">Start a room</h1>
@@ -16,6 +16,13 @@
                 width: 100%;
                 height: 100%;
             }
+            .connectionstate {
+                position: absolute;
+                top: 0px;
+                width: 100%;
+                text-align: center;
+                color: #fff
+            }
             .volume_bar {
                 position: absolute;
                 width: 5px;
@@ -24,12 +31,19 @@
                 bottom: 0px;
                 background-color: #12acef;
             }
+            .volume {
+                position: absolute;
+                left: 15%;
+                width: 70%;
+                bottom: 2px;
+                height: 10px;
+            }
         </style>
         <button id="screenShareButton"></button>
         <p id="subTitle"></p>
         <form id="createRoom">
             <input id="sessionInput"/>
-            <button type="submit">Create it!</button>
+            <button type="submit">Create Session</button>
         </form>
         <div class="videoContainer">
             <video id="localVideo" style="height: 150px;" oncontextmenu="return false;"></video>
@@ -42,6 +56,22 @@
             // grab the room from the URL
             var room = location.search && location.search.split('?')[1];
 
+            //default media options
+            var mediaOptions = {
+                audio: true,
+                video: true
+            };
+            if (selectedAudioDevice && selectedAudioDevice.sourceId) {
+                mediaOptions.audio = {
+                    deviceId: selectedAudioDevice.deviceId
+                };
+            }
+            if (selectedVideoDevice && selectedVideoDevice.sourceId) {
+                mediaOptions.video = {
+                    deviceId: selectedDevice.deviceId
+                };
+            }
+
             // create our webrtc connection
             var webrtc = new SimpleWebRTC({
                 // the id/element dom element that will hold "our" video
@@ -51,7 +81,10 @@
                 // immediately ask for camera access
                 autoRequestMedia: true,
                 debug: false,
-                detectSpeakingEvents: true
+                detectSpeakingEvents: true,
+                url:'https://example.com/',
+                //use the media options to pass constraints for getUserMedia requests
+                media: mediaOptions
             });
 
             // when it's ready, join if we got a room from the URL
@@ -86,14 +119,41 @@
                     var vol = document.createElement('div');
                     vol.id = 'volume_' + peer.id;
                     vol.className = 'volume_bar';
-                    video.onclick = function () {
+                        video.onclick = function () {
                         video.style.width = video.videoWidth + 'px';
                         video.style.height = video.videoHeight + 'px';
                     };
                     d.appendChild(vol);
                     remotes.appendChild(d);
                 }
+
+                // show the ice connection state
+                if (peer && peer.pc) {
+                    var connstate = document.createElement('div');
+                    connstate.className = 'connectionstate';
+                    container.appendChild(connstate);
+                    peer.pc.on('iceConnectionStateChange', function (event) {
+                        switch (peer.pc.iceConnectionState) {
+                        case 'checking':
+                            connstate.innerText = 'Connecting to peer...';
+                            break;
+                        case 'connected':
+                        case 'completed': // on caller side
+                            connstate.innerText = 'Connection established.';
+                            break;
+                        case 'disconnected':
+                            connstate.innerText = 'Disconnected.';
+                            break;
+                        case 'failed':
+                            break;
+                        case 'closed':
+                            connstate.innerText = 'Connection closed.';
+                            break;
+                        }
+                    });
+                }
             });
+
             webrtc.on('videoRemoved', function (video, peer) {
                 console.log('video removed ', peer);
                 var remotes = document.getElementById('remotes');
@@ -102,9 +162,35 @@
                     remotes.removeChild(el);
                 }
             });
+
             webrtc.on('volumeChange', function (volume, treshold) {
                 //console.log('own volume', volume);
                 showVolume(document.getElementById('localVolume'), volume);
+            });
+
+            // remote volume has changed
+            webrtc.on('remoteVolumeChange', function (peer, volume) {
+                showVolume(document.getElementById('volume_' + peer.id), volume);
+            });
+
+            // local p2p/ice failure
+            webrtc.on('iceFailed', function (peer) {
+                var connstate = document.querySelector('#container_' + webrtc.getDomId(peer) + ' .connectionstate');
+                console.log('local fail', connstate);
+                if (connstate) {
+                    connstate.innerText = 'Connection failed.';
+                    fileinput.disabled = 'disabled';
+                }
+            });
+
+            // remote p2p/ice failure
+            webrtc.on('connectivityError', function (peer) {
+                var connstate = document.querySelector('#container_' + webrtc.getDomId(peer) + ' .connectionstate');
+                console.log('remote fail', connstate);
+                if (connstate) {
+                    connstate.innerText = 'Connection failed.';
+                    fileinput.disabled = 'disabled';
+                }
             });
 
             // Since we use this twice we put it here
