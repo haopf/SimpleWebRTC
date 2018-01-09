@@ -4,7 +4,9 @@
         <title>MCU Demo</title>
     </head>
     <body>
+        <!--
         <h1 id="title">Start a room</h1>
+        -->
         <style>
             .videoContainer {
                 position: relative;
@@ -39,12 +41,14 @@
                 height: 10px;
             }
         </style>
+        <!--
         <button id="screenShareButton"></button>
         <p id="subTitle"></p>
         <form id="createRoom">
             <input id="sessionInput"/>
             <button type="submit">Create Session</button>
         </form>
+        -->
         <div class="videoContainer">
             <video id="localVideo" style="height: 150px;" oncontextmenu="return false;"></video>
             <div id="localVolume" class="volume_bar"></div>
@@ -72,6 +76,25 @@
                 };
             }
 
+            function showVolume(el, volume) {
+                if (!el) return;
+                if (volume < -45) { // vary between -45 and -20
+                    el.style.height = '0px';
+                } else if (volume > -20) {
+                    el.style.height = '100%';
+                } else {
+                    el.style.height = '' + Math.floor((volume + 100) * 100 / 25 - 220) + '%';
+                }
+            }
+
+            // Since we use this twice we put it here
+            function setRoom(name) {
+                $('form').remove();
+                $('h1').text(name);
+                $('#subTitle').text('Link to join: ' + location.href);
+                $('body').addClass('active');
+            }
+
             // create our webrtc connection
             var webrtc = new SimpleWebRTC({
                 // the id/element dom element that will hold "our" video
@@ -82,6 +105,7 @@
                 autoRequestMedia: true,
                 debug: false,
                 detectSpeakingEvents: true,
+                // set the signalmaster
                 url:'https://example.com/',
                 //use the media options to pass constraints for getUserMedia requests
                 media: mediaOptions
@@ -93,21 +117,12 @@
                 if (room) webrtc.joinRoom(room);
             });
 
-            function showVolume(el, volume) {
-                if (!el) return;
-                if (volume < -45) { // vary between -45 and -20
-                    el.style.height = '0px';
-                } else if (volume > -20) {
-                    el.style.height = '100%';
-                } else {
-                    el.style.height = '' + Math.floor((volume + 100) * 100 / 25 - 220) + '%';
-                }
-            }
             webrtc.on('channelMessage', function (peer, label, data) {
                 if (data.type == 'volume') {
                     showVolume(document.getElementById('volume_' + peer.id), data.volume);
                 }
             });
+
             webrtc.on('videoAdded', function (video, peer) {
                 console.log('video added', peer);
                 var remotes = document.getElementById('remotes');
@@ -193,14 +208,6 @@
                 }
             });
 
-            // Since we use this twice we put it here
-            function setRoom(name) {
-                $('form').remove();
-                $('h1').text(name);
-                $('#subTitle').text('Link to join: ' + location.href);
-                $('body').addClass('active');
-            }
-
             if (room) {
                 setRoom(room);
             } else {
@@ -243,7 +250,6 @@
                             setButton(false);
                         }
                     });
-
                 }
             });
         </script>
